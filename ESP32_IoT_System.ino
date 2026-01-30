@@ -21,6 +21,12 @@ const char* API_HOST = "192.168.1.249";
 const int API_PORT = 8080;
 const char* API_ENDPOINT = "/api/sensor-data"; // Ajusta según tu ruta en SpringBoot
 
+// IP fija ESP32 = 192.168.1.250
+IPAddress local_IP(192, 168, 1, 250);
+IPAddress gateway(192, 168, 1, 1);
+IPAddress subnet(255, 255, 255, 0);
+IPAddress dns(192, 168, 1, 1);
+
 // =====================================================
 // CONFIGURACIÓN LCD I2C
 // =====================================================
@@ -306,6 +312,10 @@ void connectToWiFi() {
   Serial.print("[WiFi] Conectando a: ");
   Serial.println(SSID);
   
+  if (!WiFi.config(local_IP, gateway, subnet, dns)) {
+    Serial.println("[WiFi] Error configurando IP fija");
+  }
+
   WiFi.begin(SSID, PASS);
   
   int attempts = 0;
