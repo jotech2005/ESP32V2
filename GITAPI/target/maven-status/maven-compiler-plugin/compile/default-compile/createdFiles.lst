@@ -1,0 +1,6 @@
+com\proyecto\dto\SensorDataDTO.class
+com\proyecto\service\SensorDataService.class
+com\proyecto\Esp32IotServerApplication.class
+com\proyecto\repository\SensorDataRepository.class
+com\proyecto\model\SensorData.class
+com\proyecto\controller\SensorDataController.class

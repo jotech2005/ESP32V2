@@ -95,8 +95,7 @@ void setup() {
   // Inicializar LCD
   initLCD();
   
-  // Inicializar Teclado
-  initKeypad();
+  // Teclado desactivado por ahora
   
   // Inicializar RFID
   initRFID();
@@ -119,8 +118,7 @@ void setup() {
 // LOOP PRINCIPAL
 // =====================================================
 void loop() {
-  // Leer teclado
-  readKeypad();
+  // Teclado desactivado por ahora
   
   // Leer RFID
   readRFID();
