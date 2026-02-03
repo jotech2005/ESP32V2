@@ -2,8 +2,9 @@ package com.proyecto.service;
 
 import com.proyecto.model.SensorData;
 import com.proyecto.repository.SensorDataRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -11,8 +12,11 @@ import java.util.Optional;
 @Service
 public class SensorDataService {
 
-    @Autowired
-    private SensorDataRepository sensorDataRepository;
+    private final SensorDataRepository sensorDataRepository;
+
+    public SensorDataService(SensorDataRepository sensorDataRepository) {
+        this.sensorDataRepository = sensorDataRepository;
+    }
 
     // =====================================================
     // CREATE - Guardar nuevos datos
@@ -32,8 +36,10 @@ public class SensorDataService {
         return sensorDataRepository.findAllByOrderByFechaCreacionDesc();
     }
 
+    // ✅ FIX: últimas N lecturas (sin LIMIT :limit)
     public List<SensorData> getLastNReadings(int limit) {
-        return sensorDataRepository.findLastNReadings(limit);
+        if (limit <= 0) return List.of();
+        return sensorDataRepository.findLastReadings(PageRequest.of(0, limit));
     }
 
     public List<SensorData> getDataByRfidTag(String rfidTag) {
@@ -59,12 +65,9 @@ public class SensorDataService {
     // =====================================================
     // UPDATE - Actualizar datos
     // =====================================================
-    public SensorData updateSensorData(Long id, SensorData updatedData) {
-        Optional<SensorData> existingData = sensorDataRepository.findById(id);
-        
-        if (existingData.isPresent()) {
-            SensorData data = existingData.get();
-            
+    public Optional<SensorData> updateSensorData(Long id, SensorData updatedData) {
+        return sensorDataRepository.findById(id).map(data -> {
+
             if (updatedData.getTemperatura() != null) {
                 data.setTemperatura(updatedData.getTemperatura());
             }
@@ -80,22 +83,18 @@ public class SensorDataService {
             if (updatedData.getUltimaTarjetaRfid() != null) {
                 data.setUltimaTarjetaRfid(updatedData.getUltimaTarjetaRfid());
             }
-            
+
             return sensorDataRepository.save(data);
-        }
-        
-        return null;
+        });
     }
 
     // =====================================================
     // DELETE - Eliminar datos
     // =====================================================
     public boolean deleteSensorData(Long id) {
-        if (sensorDataRepository.existsById(id)) {
-            sensorDataRepository.deleteById(id);
-            return true;
-        }
-        return false;
+        if (!sensorDataRepository.existsById(id)) return false;
+        sensorDataRepository.deleteById(id);
+        return true;
     }
 
     public void deleteAllSensorData() {
