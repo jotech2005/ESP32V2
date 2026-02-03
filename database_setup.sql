@@ -32,9 +32,11 @@ CREATE TABLE IF NOT EXISTS rfid_accesos (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     rfid_tag VARCHAR(20) NOT NULL UNIQUE,
     nombre_usuario VARCHAR(100),
+    pin_acceso VARCHAR(10),
     ultimo_acceso DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     contador_accesos INT DEFAULT 1,
     activo BOOLEAN DEFAULT TRUE,
+    fecha_creacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     
     INDEX idx_rfid (rfid_tag),
     INDEX idx_ultimo_acceso (ultimo_acceso)
