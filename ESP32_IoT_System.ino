@@ -92,6 +92,16 @@ HTTPClient http;
 // Variables para control de RFID (sin PIN)
 const unsigned long RFID_MESSAGE_DELAY = 2500;
 
+// Variables para calcular medias diarias
+float sumaTemperatura = 0.0;
+float sumaHumedad = 0.0;
+int contadorLecturas = 0;
+unsigned long ultimoDiaReset = 0;
+const unsigned long UN_DIA_MS = 86400000; // 24 horas en milisegundos
+
+// Estado del menú del teclado
+bool enMenu = false;
+
 // =====================================================
 // SETUP INICIAL
 // =====================================================
@@ -128,6 +138,9 @@ void setup() {
 // LOOP PRINCIPAL
 // =====================================================
 void loop() {
+  // Leer teclado para menú
+  readKeypad();
+  
   // Leer RFID normalmente
   readRFID();
 
@@ -177,7 +190,7 @@ void initKeypad() {
 // =====================================================
 // LEER TECLADO 4x4
 // =====================================================
-void readKeypad() {
+char scanKeypad() {
   for (int row = 0; row < ROWS; row++) {
     digitalWrite(rowPins[row], LOW);
     delay(5);
@@ -185,22 +198,109 @@ void readKeypad() {
     for (int col = 0; col < COLS; col++) {
       if (digitalRead(colPins[col]) == LOW) {
         char key = keys[row][col];
-        Serial.print("[KEYPAD] Tecla presionada: ");
-        Serial.println(key);
-        
-        keypadInput += key;
-        
-        if (keypadInput.length() > 16) {
-          keypadInput = keypadInput.substring(keypadInput.length() - 16);
-        }
-        
-        updateLCDDisplay();
+        digitalWrite(rowPins[row], HIGH);
         delay(200); // Debounce
+        return key;
       }
     }
     
     digitalWrite(rowPins[row], HIGH);
   }
+  return '\0'; // Sin tecla
+}
+
+void readKeypad() {
+  char key = scanKeypad();
+  
+  if (key == '\0') return; // Sin tecla presionada
+  
+  Serial.print("[KEYPAD] Tecla presionada: ");
+  Serial.println(key);
+  
+  switch (key) {
+    case '1': // Media temperatura del día
+      mostrarMediaTemperatura();
+      break;
+      
+    case '2': // Media humedad del día
+      mostrarMediaHumedad();
+      break;
+      
+    case '3': // Salir / Volver a pantalla normal
+      enMenu = false;
+      updateLCDDisplay();
+      Serial.println("[KEYPAD] Saliendo del menu");
+      break;
+      
+    default:
+      // Otras teclas - agregar al input
+      keypadInput += key;
+      if (keypadInput.length() > 16) {
+        keypadInput = keypadInput.substring(keypadInput.length() - 16);
+      }
+      updateLCDDisplay();
+      break;
+  }
+}
+
+// =====================================================
+// MOSTRAR MEDIA TEMPERATURA
+// =====================================================
+void mostrarMediaTemperatura() {
+  enMenu = true;
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("MEDIA TEMP DIA:");
+  lcd.setCursor(0, 1);
+  
+  if (contadorLecturas > 0) {
+    float media = sumaTemperatura / contadorLecturas;
+    lcd.print(media, 1);
+    lcd.print("C (");
+    lcd.print(contadorLecturas);
+    lcd.print(" lect)");
+    Serial.print("[KEYPAD] Media temperatura: ");
+    Serial.print(media);
+    Serial.println("C");
+  } else {
+    lcd.print("Sin datos");
+    Serial.println("[KEYPAD] Sin datos de temperatura");
+  }
+  
+  delay(3000);
+  if (!enMenu) return;
+  updateLCDDisplay();
+  enMenu = false;
+}
+
+// =====================================================
+// MOSTRAR MEDIA HUMEDAD
+// =====================================================
+void mostrarMediaHumedad() {
+  enMenu = true;
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("MEDIA HUM DIA:");
+  lcd.setCursor(0, 1);
+  
+  if (contadorLecturas > 0) {
+    float media = sumaHumedad / contadorLecturas;
+    lcd.print(media, 1);
+    lcd.print("% (");
+    lcd.print(contadorLecturas);
+    lcd.print(" lect)");
+    Serial.print("[KEYPAD] Media humedad: ");
+    Serial.print(media);
+    Serial.println("%");
+  } else {
+    lcd.print("Sin datos");
+    Serial.println("[KEYPAD] Sin datos de humedad");
+  }
+  
+  delay(3000);
+  if (!enMenu) return;
+  updateLCDDisplay();
+  enMenu = false;
 }
 
 
@@ -347,6 +447,15 @@ void sendRFIDAccess(const String& rfidTag) {
 // LEER SENSORES DHT11 Y LUZ
 // =====================================================
 void readSensors() {
+  // Resetear medias cada 24 horas
+  if (millis() - ultimoDiaReset >= UN_DIA_MS) {
+    sumaTemperatura = 0.0;
+    sumaHumedad = 0.0;
+    contadorLecturas = 0;
+    ultimoDiaReset = millis();
+    Serial.println("[SENSORES] Medias diarias reseteadas");
+  }
+  
   // DHT11
   temperature = dht.readTemperature();
   humidity = dht.readHumidity();
@@ -356,11 +465,18 @@ void readSensors() {
     temperature = 0.0;
     humidity = 0.0;
   } else {
+    // Acumular para medias
+    sumaTemperatura += temperature;
+    sumaHumedad += humidity;
+    contadorLecturas++;
+    
     Serial.print("[DHT11] Temp: ");
     Serial.print(temperature);
     Serial.print("C - Humedad: ");
     Serial.print(humidity);
-    Serial.println("%");
+    Serial.print("% (Lecturas: ");
+    Serial.print(contadorLecturas);
+    Serial.println(")");
   }
   
   // Sensor de luz
