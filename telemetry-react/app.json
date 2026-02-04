@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "name": "TelemetryReact",
+    "slug": "telemetry-react",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "android": {
+      "package": "com.example.telemetryreact"
+    },
+    "extra": {
+      "apiBase": "http://192.168.1.249:8080/api/telemetry"
+    }
+  }
+}

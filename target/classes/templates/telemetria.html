@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="es" data-api-base="">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Histórico | Telemetría</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Space Grotesk', system-ui, sans-serif; }
+        .bg-grid { background: radial-gradient(circle at 1px 1px, rgba(255,255,255,0.12) 1px, transparent 0); background-size: 24px 24px; }
+    </style>
+</head>
+<body id="telemetria" class="min-h-screen bg-slate-950 text-slate-100">
+<header class="bg-slate-900/70 border-b border-slate-800 backdrop-blur">
+    <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <div class="h-10 w-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-200 font-semibold">IoT</div>
+            <div>
+                <p class="text-sm text-slate-400">Histórico</p>
+                <h1 class="text-lg font-semibold">Telemetría</h1>
+            </div>
+        </div>
+        <nav class="flex items-center gap-4 text-sm text-slate-300">
+            <a class="hover:text-white" href="/">Dashboard</a>
+            <a class="hover:text-white" href="/telemetria">Histórico</a>
+        </nav>
+    </div>
+</header>
+
+<main class="max-w-6xl mx-auto px-4 pb-12">
+    <section class="py-10 space-y-6">
+        <div class="bg-gradient-to-r from-slate-900 to-slate-950 rounded-3xl border border-slate-800 p-6 sm:p-8">
+            <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-6">
+                <div>
+                    <p class="text-sm text-emerald-300">Consulta</p>
+                    <h2 class="text-2xl font-semibold">Filtra las lecturas</h2>
+                    <p class="text-slate-400 text-sm">Ajusta por UID y rango de fechas antes de consultar la API.</p>
+                </div>
+                <button id="search-btn" class="px-4 py-2 rounded-xl bg-emerald-500/15 text-emerald-100 border border-emerald-500/30 hover:bg-emerald-500/25">Buscar</button>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                <div class="flex flex-col gap-2">
+                    <label class="text-sm text-slate-400" for="filter-uid">UID</label>
+                    <input id="filter-uid" type="text" placeholder="ej: device-01" class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/40" />
+                </div>
+                <div class="flex flex-col gap-2">
+                    <label class="text-sm text-slate-400" for="filter-from">Desde</label>
+                    <input id="filter-from" type="date" class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/40" />
+                </div>
+                <div class="flex flex-col gap-2">
+                    <label class="text-sm text-slate-400" for="filter-to">Hasta</label>
+                    <input id="filter-to" type="date" class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/40" />
+                </div>
+            </div>
+
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+                <div class="flex items-center justify-between px-4 py-3 border-b border-slate-800 text-sm text-slate-300">
+                    <div class="flex items-center gap-3">
+                        <span id="table-count" class="px-2 py-1 rounded-lg bg-slate-800 text-slate-200">0</span>
+                        <span>registros</span>
+                    </div>
+                    <button id="clear-btn" class="text-slate-400 hover:text-white">Limpiar tabla</button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-sm">
+                        <thead class="bg-slate-800 text-slate-300">
+                            <tr>
+                                <th class="px-4 py-3 text-left">Fecha</th>
+                                <th class="px-4 py-3 text-left">UID</th>
+                                <th class="px-4 py-3 text-left">Luz</th>
+                                <th class="px-4 py-3 text-left">Temp (°C)</th>
+                                <th class="px-4 py-3 text-left">Hum (%)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-body" class="divide-y divide-slate-800 text-slate-200">
+                            <tr>
+                                <td colspan="5" class="px-4 py-6 text-center text-slate-400">Sin datos aún</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
+</main>
+
+<script src="/js/app.js"></script>
+</body>
+</html>
