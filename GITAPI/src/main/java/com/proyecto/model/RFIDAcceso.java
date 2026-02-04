@@ -37,12 +37,8 @@ public class RFIDAcceso {
     @Column(name = "activo")
     private Boolean activo = true;
 
-    @Column(name = "fecha_creacion", nullable = false, updatable = false)
-    private LocalDateTime fechaCreacion;
-
     @PrePersist
     protected void onCreate() {
-        this.fechaCreacion = LocalDateTime.now();
         this.ultimoAcceso = LocalDateTime.now();
     }
 
@@ -115,13 +111,5 @@ public class RFIDAcceso {
 
     public void setActivo(Boolean activo) {
         this.activo = activo;
-    }
-
-    public LocalDateTime getFechaCreacion() {
-        return fechaCreacion;
-    }
-
-    public void setFechaCreacion(LocalDateTime fechaCreacion) {
-        this.fechaCreacion = fechaCreacion;
     }
 }

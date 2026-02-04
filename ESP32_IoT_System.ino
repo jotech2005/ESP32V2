@@ -89,13 +89,8 @@ const unsigned long SEND_INTERVAL = 10000; // 10 segundos
 WiFiClient client;
 HTTPClient http;
 
-// Variables para control de PIN
-String cardPinInput = "";
-String currentCardUID = "";
-bool waitingForPIN = false;
-unsigned long pinEntryTimeout = 0;
-const unsigned long PIN_TIMEOUT = 30000; // 30 segundos para ingresar PIN
-const int MAX_PIN_LENGTH = 6;
+// Variables para control de RFID (sin PIN)
+const unsigned long RFID_MESSAGE_DELAY = 2500;
 
 // =====================================================
 // SETUP INICIAL
@@ -133,38 +128,18 @@ void setup() {
 // LOOP PRINCIPAL
 // =====================================================
 void loop() {
-  // Verificar si estamos esperando PIN
-  if (waitingForPIN) {
-    // Verificar timeout
-    if (millis() - pinEntryTimeout > PIN_TIMEOUT) {
-      Serial.println("[PIN] Timeout - acceso cancelado");
-      lcd.clear();
-      lcd.print("TIMEOUT");
-      lcd.setCursor(0, 1);
-      lcd.print("Acceso cancelado");
-      delay(2000);
-      waitingForPIN = false;
-      cardPinInput = "";
-      currentCardUID = "";
-      updateLCDDisplay();
-    } else {
-      // Leer teclado para PIN
-      readKeypadForPIN();
-    }
-  } else {
-    // Leer RFID normalmente
-    readRFID();
-    
-    // Leer sensores
-    readSensors();
-    
-    // Enviar datos cada 10 segundos
-    if (millis() - lastSendTime >= SEND_INTERVAL) {
-      sendDataToAPI();
-      lastSendTime = millis();
-    }
+  // Leer RFID normalmente
+  readRFID();
+
+  // Leer sensores
+  readSensors();
+
+  // Enviar datos cada 10 segundos
+  if (millis() - lastSendTime >= SEND_INTERVAL) {
+    sendDataToAPI();
+    lastSendTime = millis();
   }
-  
+
   delay(50);
 }
 
@@ -228,78 +203,6 @@ void readKeypad() {
   }
 }
 
-// =====================================================
-// LEER TECLADO PARA PIN
-// =====================================================
-void readKeypadForPIN() {
-  for (int row = 0; row < ROWS; row++) {
-    digitalWrite(rowPins[row], LOW);
-    delay(5);
-    
-    for (int col = 0; col < COLS; col++) {
-      if (digitalRead(colPins[col]) == LOW) {
-        char key = keys[row][col];
-        Serial.print("[PIN] Tecla presionada: ");
-        Serial.println(key);
-        
-        delay(200); // Debounce
-        
-        // Procesar la tecla
-        if (key == '#') {  // Confirmar PIN
-          if (cardPinInput.length() >= 4) {
-            Serial.println("[PIN] Confirmando PIN...");
-            verifyCardPIN();
-          } else {
-            Serial.println("[PIN] PIN muy corto (mínimo 4 dígitos)");
-            lcd.clear();
-            lcd.print("PIN corto");
-            lcd.setCursor(0, 1);
-            lcd.print("Min 4 digitos");
-            delay(1500);
-            displayPINEntry();
-          }
-        } 
-        else if (key == '*') {  // Cancelar
-          Serial.println("[PIN] Acceso cancelado por usuario");
-          lcd.clear();
-          lcd.print("CANCELADO");
-          delay(2000);
-          waitingForPIN = false;
-          cardPinInput = "";
-          currentCardUID = "";
-          updateLCDDisplay();
-        }
-        else if (cardPinInput.length() < MAX_PIN_LENGTH) {  // Agregar dígito
-          cardPinInput += key;
-          displayPINEntry();
-        }
-      }
-    }
-    
-    digitalWrite(rowPins[row], HIGH);
-  }
-}
-
-// =====================================================
-// MOSTRAR PANTALLA DE ENTRADA DE PIN
-// =====================================================
-void displayPINEntry() {
-  lcd.clear();
-  lcd.print("PIN:");
-  
-  // Mostrar asteriscos en lugar del PIN real
-  String pinDisplay = "";
-  for (int i = 0; i < cardPinInput.length(); i++) {
-    pinDisplay += "*";
-  }
-  lcd.print(pinDisplay);
-  
-  lcd.setCursor(0, 1);
-  lcd.print("# confirmar");
-  if (cardPinInput.length() > 0) {
-    lcd.print(" * canc");
-  }
-}
 
 // =====================================================
 // INICIALIZAR RFID
@@ -339,113 +242,104 @@ void readRFID() {
   Serial.print("[RFID] Tarjeta detectada: ");
   Serial.println(rfidTag);
   
-  // Guardar UID para verificación de PIN
-  currentCardUID = rfidTag;
-  
-  // Mostrar en LCD
+  // Mostrar en LCD y registrar acceso
   lcd.clear();
   lcd.print("TARJETA:");
   lcd.setCursor(0, 1);
   lcd.print(rfidTag.substring(0, 13));
-  delay(2000);
-  
-  // Solicitar PIN
-  waitingForPIN = true;
-  cardPinInput = "";
-  pinEntryTimeout = millis();
-  
-  Serial.println("[PIN] Esperando entrada de PIN...");
-  displayPINEntry();
+  delay(800);
+
+  sendRFIDAccess(rfidTag);
   
   rfid.PICC_HaltA();
   rfid.PCD_StopCrypto1();
 }
 
 // =====================================================
-// VERIFICAR PIN DE TARJETA
+// REGISTRAR ACCESO RFID (SIN PIN)
 // =====================================================
-void verifyCardPIN() {
-  // Enviar solicitud al servidor para verificar PIN
+void sendRFIDAccess(const String& rfidTag) {
+  // Crear JSON
   String jsonPayload;
   StaticJsonDocument<256> doc;
-  doc["rfid_tag"] = currentCardUID;
-  doc["pin_ingresado"] = cardPinInput;
-  doc["accion"] = "verificar_pin";
-  
+  doc["rfid_tag"] = rfidTag;
+  doc["accion"] = "toggle";
+
   serializeJson(doc, jsonPayload);
-  
-  Serial.print("[PIN] Enviando verificación: ");
+
+  Serial.print("[RFID] Enviando acceso: ");
   Serial.println(jsonPayload);
-  
+
   if (WiFi.status() == WL_CONNECTED) {
     String url = "http://" + String(API_HOST) + ":" + String(API_PORT) + "/api/rfid-auth";
-    
+
+    Serial.print("[RFID] URL destino: ");
+    Serial.println(url);
+
     http.begin(client, url);
     http.addHeader("Content-Type", "application/json");
-    
+    http.setTimeout(5000);
+
     int httpResponseCode = http.POST(jsonPayload);
-    
-    Serial.print("[PIN] Código respuesta: ");
+
+    Serial.print("[RFID] Código respuesta: ");
     Serial.println(httpResponseCode);
-    
-    if (httpResponseCode == 200) {
+
+    if (httpResponseCode == 200 || httpResponseCode == 201) {
       String response = http.getString();
-      
-      // Parsear respuesta
+
       StaticJsonDocument<256> responseDoc;
-      deserializeJson(responseDoc, response);
-      
-      bool autenticado = responseDoc["autenticado"] | false;
-      bool esNuevaTargeta = responseDoc["es_nueva"] | false;
-      
-      Serial.print("[PIN] Respuesta: ");
+      DeserializationError error = deserializeJson(responseDoc, response);
+
+      Serial.print("[RFID] Respuesta JSON: ");
       Serial.println(response);
-      
-      if (autenticado) {
-        // Acceso permitido
-        Serial.println("[PIN] ✓ ACCESO PERMITIDO");
+
+      if (error) {
+        Serial.print("[RFID] Error al parsear JSON: ");
+        Serial.println(error.c_str());
         lcd.clear();
-        lcd.print("✓ ADELANTE");
-        if (esNuevaTargeta) {
-          lcd.setCursor(0, 1);
-          lcd.print("PIN registrado");
-        } else {
-          lcd.setCursor(0, 1);
-          lcd.print("Bienvenido!");
-        }
-        delay(3000);
+        lcd.print("ERROR JSON");
+        delay(2000);
       } else {
-        // Acceso denegado
-        Serial.println("[PIN] ✗ ACCESO DENEGADO");
+        bool autenticado = responseDoc["autenticado"] | false;
+        bool esNuevaTarjeta = responseDoc["es_nueva"] | false;
+        const char* mensaje = responseDoc["mensaje"] | "Sin respuesta";
+
         lcd.clear();
-        lcd.print("✗ ACCESO DENEGADO");
-        lcd.setCursor(0, 1);
-        lcd.print("PIN incorrecto");
-        delay(3000);
+        if (autenticado) {
+          lcd.print(mensaje);
+          if (esNuevaTarjeta) {
+            lcd.setCursor(0, 1);
+            lcd.print("Registrada");
+          }
+        } else {
+          lcd.print("DENEGADO");
+          lcd.setCursor(0, 1);
+          lcd.print(mensaje);
+        }
+        delay(RFID_MESSAGE_DELAY);
       }
     } else {
-      // Error en comunicación
-      Serial.print("[PIN] Error en servidor: ");
-      Serial.println(http.errorToString(httpResponseCode));
+      Serial.print("[RFID] Error HTTP: ");
+      Serial.println(httpResponseCode);
       lcd.clear();
-      lcd.print("ERROR");
+      lcd.print("ERROR HTTP");
       lcd.setCursor(0, 1);
-      lcd.print("Sin conexion");
+      lcd.print(httpResponseCode);
       delay(2000);
     }
-    
+
     http.end();
   } else {
-    Serial.println("[PIN] WiFi desconectado");
+    Serial.println("[RFID] ERROR: WiFi desconectado");
     lcd.clear();
     lcd.print("ERROR WiFi");
+    lcd.setCursor(0, 1);
+    lcd.print("Reconectando");
     delay(2000);
+    connectToWiFi();
   }
-  
-  // Limpiar variables
-  waitingForPIN = false;
-  cardPinInput = "";
-  currentCardUID = "";
+
   updateLCDDisplay();
 }
 
