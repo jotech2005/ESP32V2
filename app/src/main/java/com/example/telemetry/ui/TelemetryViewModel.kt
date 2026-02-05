@@ -15,11 +15,18 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 
 data class TelemetryUi(
-    val datetime: String,
-    val uid: String,
-    val luz: Int?,
-    val temp: Double?,
-    val hum: Double?
+    val id: Long,
+    val rfidTag: String?,
+    val temperatura: Double?,
+    val humedad: Double?,
+    val luzDetectada: Boolean?,
+    val fechaCreacion: String?,
+    // Campos de compatibilidad
+    val datetime: String? = fechaCreacion,
+    val uid: String? = rfidTag,
+    val luz: Int? = if (luzDetectada == true) 1 else if (luzDetectada == false) 0 else null,
+    val temp: Double? = temperatura,
+    val hum: Double? = humedad
 )
 
 data class DashboardUiState(
@@ -65,17 +72,17 @@ class TelemetryViewModel(private val repository: TelemetryRepository) : ViewMode
             error.value = null
             runCatching { repository.refreshLatest() }
                 .onFailure { error.value = it.message }
-            runCatching { repository.refreshHistory(uid = null, from = null, to = null) }
+            runCatching { repository.refreshHistory(rfidTag = null, from = null, to = null) }
                 .onFailure { error.value = it.message }
             loading.value = false
         }
     }
 
-    fun refreshHistory(uid: String?, from: String?, to: String?) {
+    fun refreshHistory(rfidTag: String?, from: String?, to: String?) {
         viewModelScope.launch(Dispatchers.IO) {
             loading.value = true
             error.value = null
-            runCatching { repository.refreshHistory(uid, from, to) }
+            runCatching { repository.refreshHistory(rfidTag, from, to) }
                 .onFailure { error.value = it.message }
             loading.value = false
         }
@@ -83,11 +90,12 @@ class TelemetryViewModel(private val repository: TelemetryRepository) : ViewMode
 }
 
 private fun TelemetryEntity.toUi() = TelemetryUi(
-    datetime = datetime,
-    uid = uid,
-    luz = luz,
-    temp = temp,
-    hum = hum
+    id = id,
+    rfidTag = rfidTag,
+    temperatura = temperatura,
+    humedad = humedad,
+    luzDetectada = luzDetectada,
+    fechaCreacion = fechaCreacion
 )
 
 class TelemetryViewModelFactory(

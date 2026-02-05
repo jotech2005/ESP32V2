@@ -15,7 +15,7 @@ android {
         versionCode = 1
         versionName = "1.0"
         vectorDrawables.useSupportLibrary = true
-        buildConfigField("String", "API_BASE", "\"http://192.168.0.10:8080/\"") // cambia a la IP privada cuando la tengas
+        buildConfigField("String", "API_BASE", "\"http://192.168.1.249:8080/\"")
     }
 
     buildTypes {
@@ -41,6 +41,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.10"

@@ -33,19 +33,32 @@ export function useTelemetry() {
 
   const normalizeItem = useCallback((item) => {
     if (!item || typeof item !== 'object') return item;
-    const temp = toNumber(item.temp);
-    const hum = toNumber(item.hum);
-    const luz = item.luz === 1 || item.luz === '1' ? 1 : item.luz === 0 || item.luz === '0' ? 0 : item.luz ?? null;
-    const dateValue = item.datetime ?? item.date ?? item.timestamp ?? item.time;
+    // Mapeo de campos nuevos de la API (SensorData)
+    const temp = toNumber(item.temperatura ?? item.temp);
+    const hum = toNumber(item.humedad ?? item.hum);
+    const luz = item.luzDetectada === true || item.luzDetectada === 'true' ? 1 
+              : item.luzDetectada === false || item.luzDetectada === 'false' ? 0 
+              : item.luz === 1 || item.luz === '1' ? 1 
+              : item.luz === 0 || item.luz === '0' ? 0 
+              : item.luz ?? null;
+    const rfidTag = item.rfidTag ?? item.uid ?? null;
+    const dateValue = item.fechaCreacion ?? item.datetime ?? item.date ?? item.timestamp ?? item.time;
     const parsedDate = parseDate(dateValue);
 
     return {
       ...item,
+      id: item.id,
       temp,
       hum,
       luz,
-      datetime: parsedDate ? parsedDate.toISOString() : item.datetime,
-      formattedDate: parsedDate ? parsedDate.toLocaleString() : (item.datetime ?? '—'),
+      luzDetectada: luz === 1,
+      rfidTag,
+      uid: rfidTag, // Compatibilidad
+      temperatura: temp,
+      humedad: hum,
+      datetime: parsedDate ? parsedDate.toISOString() : item.fechaCreacion,
+      fechaCreacion: item.fechaCreacion,
+      formattedDate: parsedDate ? parsedDate.toLocaleString() : (item.fechaCreacion ?? '—'),
       _date: parsedDate ? parsedDate.getTime() : 0,
     };
   }, []);
@@ -78,7 +91,7 @@ export function useTelemetry() {
     setLoadingHistory(true);
 
     const [historyRes] = await Promise.allSettled([
-      api.list({ limit: 50, sort: 'desc', ...filters }),
+      api.getLatest(50),
     ]);
 
     if (!mountedRef.current) return;
@@ -108,7 +121,14 @@ export function useTelemetry() {
     setLoadingHistory(true);
     setError(null);
     try {
-      const list = await api.list({ limit: 100, sort: 'desc', ...filters });
+      let list;
+      if (filters.rfidTag) {
+        list = await api.getByRfid(filters.rfidTag);
+      } else if (filters.startDate && filters.endDate) {
+        list = await api.getByDateRange(filters.startDate, filters.endDate);
+      } else {
+        list = await api.getLatest(100);
+      }
       const normalized = normalizeHistory(list);
       if (mountedRef.current) {
         setHistory(normalized);

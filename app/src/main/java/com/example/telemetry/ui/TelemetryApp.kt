@@ -3,6 +3,7 @@ package com.example.telemetry.ui
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,6 +16,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -48,6 +50,7 @@ import java.time.format.DateTimeParseException
 
 private enum class TelemetryTab(val label: String) { DASHBOARD("Dashboard"), HISTORY("Histórico") }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TelemetryApp(viewModel: TelemetryViewModel) {
     val dashboard by viewModel.dashboardState.collectAsState()
@@ -160,7 +163,7 @@ private fun HistoryScreen(
                 Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f))) {
                     Column(Modifier.padding(12.dp)) {
                         Text(formatDate(item.datetime), style = MaterialTheme.typography.labelMedium)
-                        Text(item.uid, fontWeight = FontWeight.SemiBold)
+                        Text(item.uid ?: "—", fontWeight = FontWeight.SemiBold)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text("Luz: ${item.luz ?: "—"}")
                             Text("T: ${item.temp ?: "—"}")
@@ -185,7 +188,7 @@ private fun MetricCard(title: String, value: String) {
 }
 
 @Composable
-private fun FilterField(label: String, value: String, onValueChange: (String) -> Unit) {
+private fun RowScope.FilterField(label: String, value: String, onValueChange: (String) -> Unit) {
     Column(Modifier.weight(1f)) {
         Text(label, style = MaterialTheme.typography.labelMedium)
         androidx.compose.material3.OutlinedTextField(

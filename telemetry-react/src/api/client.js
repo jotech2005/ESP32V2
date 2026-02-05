@@ -1,6 +1,6 @@
 import Constants from 'expo-constants';
 
-const base = (Constants?.expoConfig?.extra?.apiBase || '').replace(/\/$/, '') || 'http://192.168.1.249:8080/api/telemetry/batch';
+const base = (Constants?.expoConfig?.extra?.apiBase || '').replace(/\/$/, '') || 'http://192.168.1.249:8080';
 const DEFAULT_TIMEOUT_MS = 8000;
 
 async function request(path, params = {}, { method = 'GET', body, timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
@@ -37,22 +37,97 @@ async function request(path, params = {}, { method = 'GET', body, timeoutMs = DE
   return res.json();
 }
 
+// Normaliza la respuesta de la API para extraer los datos
+const extractData = (response) => {
+  if (response?.success && response?.data) {
+    return response.data;
+  }
+  return response;
+};
+
 export const api = {
-  list: (opts = {}) => request('', opts),
-  getById: (id) => request(`/${id}`),
-  create: (payload) => request('', {}, { method: 'POST', body: payload }),
-  replace: (id, payload) => request(`/${id}`, {}, { method: 'PUT', body: payload }),
-  patch: (id, payload) => request(`/${id}`, {}, { method: 'PATCH', body: payload }),
-  remove: (id) => request(`/${id}`, {}, { method: 'DELETE' }),
+  // GET: Obtener todos los datos
+  list: async (opts = {}) => {
+    const response = await request('/api/sensor-data', opts);
+    return extractData(response);
+  },
+
+  // GET: Obtener por ID
+  getById: async (id) => {
+    const response = await request(`/api/sensor-data/${id}`);
+    return extractData(response);
+  },
+
+  // GET: Últimas N lecturas
+  getLatest: async (limit = 10) => {
+    const response = await request(`/api/sensor-data/latest/${limit}`);
+    return extractData(response);
+  },
+
+  // GET: Buscar por RFID
+  getByRfid: async (rfidTag) => {
+    const response = await request(`/api/sensor-data/rfid/${rfidTag}`);
+    return extractData(response);
+  },
+
+  // GET: Buscar por rango de fechas
+  getByDateRange: async (startDate, endDate) => {
+    const response = await request('/api/sensor-data/date-range', { startDate, endDate });
+    return extractData(response);
+  },
+
+  // GET: Datos con luz detectada
+  getLightDetected: async () => {
+    const response = await request('/api/sensor-data/light-detected');
+    return extractData(response);
+  },
+
+  // POST: Crear nuevo registro
+  create: async (payload) => {
+    const response = await request('/api/sensor-data', {}, { method: 'POST', body: payload });
+    return response;
+  },
+
+  // PUT: Actualizar registro
+  replace: async (id, payload) => {
+    const response = await request(`/api/sensor-data/${id}`, {}, { method: 'PUT', body: payload });
+    return response;
+  },
+
+  // DELETE: Eliminar registro
+  remove: async (id) => {
+    const response = await request(`/api/sensor-data/${id}`, {}, { method: 'DELETE' });
+    return response;
+  },
+
+  // GET: Estadísticas - total de registros
+  getTotalRecords: async () => {
+    const response = await request('/api/sensor-data/stats/total-records');
+    return response;
+  },
+
+  // GET: Estadísticas - temperatura máxima
+  getMaxTemperature: async (startDate, endDate) => {
+    const response = await request('/api/sensor-data/stats/temperature-max', { startDate, endDate });
+    return response;
+  },
+
+  // GET: Estadísticas - humedad promedio
+  getAverageHumidity: async (startDate, endDate) => {
+    const response = await request('/api/sensor-data/stats/humidity-avg', { startDate, endDate });
+    return response;
+  },
+
+  // GET: Health check
+  health: async () => {
+    const response = await request('/api/sensor-data/health');
+    return response;
+  },
+
+  // GET: Última lectura (helper)
   latest: async () => {
-    const list = await request('');
+    const list = await api.getLatest(1);
     if (!Array.isArray(list) || list.length === 0) return null;
-    return list.reduce((acc, item) => {
-      if (!acc) return item;
-      const accDate = new Date(acc.datetime || acc.date || acc.timestamp || 0).getTime();
-      const itemDate = new Date(item.datetime || item.date || item.timestamp || 0).getTime();
-      if (!Number.isFinite(accDate) || !Number.isFinite(itemDate)) return acc;
-      return itemDate > accDate ? item : acc;
-    }, null);
+    return list[0];
   },
 };

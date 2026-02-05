@@ -1,7 +1,12 @@
 (() => {
     const API_BASE = (window.API_BASE || document.documentElement.dataset.apiBase || "").trim();
     const endpoints = {
-        list: "/api/telemetry"
+        list: "/api/sensor-data",
+        latest: "/api/sensor-data/latest",
+        byRfid: "/api/sensor-data/rfid",
+        dateRange: "/api/sensor-data/date-range",
+        lightDetected: "/api/sensor-data/light-detected",
+        health: "/api/sensor-data/health"
     };
 
     const getBaseUrl = () => {
@@ -29,6 +34,14 @@
         return res.json();
     };
 
+    // Extrae los datos de la respuesta de la API
+    const extractData = (response) => {
+        if (response?.success && response?.data) {
+            return response.data;
+        }
+        return response;
+    };
+
     const formatDate = (str) => {
         if (!str) return "—";
         const d = new Date(str);
@@ -41,18 +54,32 @@
         if (el) el.textContent = value;
     };
 
-    const getDisplayDate = (item) => item?.received_at ?? null;
+    // Adaptar para usar fechaCreacion del nuevo API
+    const getDisplayDate = (item) => item?.fechaCreacion ?? item?.received_at ?? null;
+    
+    // Normalizar campos del nuevo API
+    const normalizeItem = (item) => {
+        if (!item) return item;
+        return {
+            ...item,
+            temp: item.temperatura ?? item.temp,
+            hum: item.humedad ?? item.hum,
+            luz: item.luzDetectada === true ? 1 : item.luzDetectada === false ? 0 : item.luz,
+            uid: item.rfidTag ?? item.uid
+        };
+    };
 
     const updateCards = (data) => {
-        setText("card-datetime", formatDate(getDisplayDate(data)));
-        setText("card-uid", data?.uid ? `UID: ${data.uid}` : "UID: —");
-        setText("card-temp", Number.isFinite(data?.temp) ? `${Number(data.temp).toFixed(1)}` : "—");
-        setText("card-hum", Number.isFinite(data?.hum) ? `${Number(data.hum).toFixed(1)}` : "—");
-        const luzText = data?.luz === 1 ? "Encendida" : data?.luz === 0 ? "Apagada" : "—";
+        const item = normalizeItem(data);
+        setText("card-datetime", formatDate(getDisplayDate(item)));
+        setText("card-uid", item?.uid ? `UID: ${item.uid}` : "UID: —");
+        setText("card-temp", Number.isFinite(item?.temp) ? `${Number(item.temp).toFixed(1)}` : "—");
+        setText("card-hum", Number.isFinite(item?.hum) ? `${Number(item.hum).toFixed(1)}` : "—");
+        const luzText = item?.luz === 1 ? "Encendida" : item?.luz === 0 ? "Apagada" : "—";
         setText("card-luz", luzText);
         const dot = document.getElementById("card-luz-dot");
         if (dot) {
-            dot.className = "h-3 w-3 rounded-full " + (data?.luz === 1 ? "bg-emerald-400" : data?.luz === 0 ? "bg-slate-600" : "bg-slate-700");
+            dot.className = "h-3 w-3 rounded-full " + (item?.luz === 1 ? "bg-emerald-400" : item?.luz === 0 ? "bg-slate-600" : "bg-slate-700");
         }
     };
 
@@ -60,9 +87,10 @@
     const renderChart = (series = []) => {
         const ctx = document.getElementById("telemetry-chart");
         if (!ctx || typeof Chart === "undefined") return;
-        const labels = series.map(item => formatDate(getDisplayDate(item)));
-        const tempData = series.map(item => item.temp ?? null);
-        const humData = series.map(item => item.hum ?? null);
+        const normalizedSeries = series.map(normalizeItem);
+        const labels = normalizedSeries.map(item => formatDate(getDisplayDate(item)));
+        const tempData = normalizedSeries.map(item => item.temp ?? null);
+        const humData = normalizedSeries.map(item => item.hum ?? null);
         if (telemetryChart) telemetryChart.destroy();
         telemetryChart = new Chart(ctx, {
             type: "line",
@@ -103,11 +131,16 @@
         return Number.isNaN(t) ? 0 : t;
     };
 
-    const normalizeRows = (rows) => (Array.isArray(rows) ? rows : []);
+    const normalizeRows = (response) => {
+        const data = extractData(response);
+        return Array.isArray(data) ? data : [];
+    };
 
     const loadDashboard = async () => {
         try {
-            const rows = normalizeRows(await fetchJson(endpoints.list));
+            // Usar el endpoint latest para obtener las últimas lecturas
+            const response = await fetchJson(`${endpoints.latest}/30`);
+            const rows = normalizeRows(response);
             const sorted = rows.slice().sort((a, b) => toTimestamp(getDisplayDate(a)) - toTimestamp(getDisplayDate(b)));
             const latest = sorted[sorted.length - 1];
             updateCards(latest || null);
@@ -128,7 +161,8 @@
         if (!rows.length) {
             tbody.innerHTML = `<tr><td colspan="5" class="px-4 py-6 text-center text-slate-400">Sin datos</td></tr>`;
         } else {
-            rows.forEach(item => {
+            rows.forEach(rawItem => {
+                const item = normalizeItem(rawItem);
                 const tr = document.createElement("tr");
                 tr.className = "hover:bg-slate-800/40";
                 tr.innerHTML = `
@@ -149,19 +183,19 @@
         const from = document.getElementById("filter-from")?.value;
         const to = document.getElementById("filter-to")?.value;
         try {
-            const rows = normalizeRows(await fetchJson(endpoints.list));
-            const fromDate = from ? new Date(`${from}T00:00:00`) : null;
-            const toDate = to ? new Date(`${to}T23:59:59.999`) : null;
-            const filtered = rows.filter(item => {
-                if (uid && String(item?.uid || "").toLowerCase().includes(uid.toLowerCase()) === false) {
-                    return false;
-                }
-                const ts = toTimestamp(getDisplayDate(item));
-                if (fromDate && ts < fromDate.getTime()) return false;
-                if (toDate && ts > toDate.getTime()) return false;
-                return true;
-            });
-            const sorted = filtered.slice().sort((a, b) => toTimestamp(getDisplayDate(b)) - toTimestamp(getDisplayDate(a)));
+            let response;
+            // Usar endpoints específicos según los filtros
+            if (uid) {
+                response = await fetchJson(`${endpoints.byRfid}/${encodeURIComponent(uid)}`);
+            } else if (from && to) {
+                const startDate = `${from}T00:00:00`;
+                const endDate = `${to}T23:59:59`;
+                response = await fetchJson(endpoints.dateRange, { startDate, endDate });
+            } else {
+                response = await fetchJson(endpoints.list);
+            }
+            const rows = normalizeRows(response);
+            const sorted = rows.slice().sort((a, b) => toTimestamp(getDisplayDate(b)) - toTimestamp(getDisplayDate(a)));
             renderTable(sorted);
         } catch (err) {
             console.error("No se pudo cargar la tabla", err);

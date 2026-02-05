@@ -8,10 +8,10 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface TelemetryDao {
-    @Query("SELECT * FROM telemetry ORDER BY datetime DESC LIMIT 1")
+    @Query("SELECT * FROM telemetry ORDER BY fechaCreacion DESC LIMIT 1")
     fun observeLatest(): Flow<TelemetryEntity?>
 
-    @Query("SELECT * FROM telemetry ORDER BY datetime DESC")
+    @Query("SELECT * FROM telemetry ORDER BY fechaCreacion DESC")
     fun observeHistory(): Flow<List<TelemetryEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
