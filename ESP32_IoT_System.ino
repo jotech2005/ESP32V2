@@ -45,7 +45,7 @@ LiquidCrystal_I2C lcd(LCD_ADDR, LCD_COLS, LCD_ROWS);
 int rowPins[ROWS] = {13, 12, 14, 25};
 
 // Pines de las columnas (entrada)
-int colPins[COLS] = {33, 32, 16, 17};
+int colPins[COLS] = {33, 32, 2, 4};
 
 char keys[ROWS][COLS] = {
   {'1', '2', '3', 'A'},
